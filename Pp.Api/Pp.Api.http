@@ -1,0 +1,6 @@
+@Pp.Api_HostAddress = http://localhost:5193
+
+GET {{Pp.Api_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
