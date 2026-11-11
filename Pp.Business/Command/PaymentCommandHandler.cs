@@ -50,7 +50,7 @@ public class ProcessPaymentCommandHandler : IRequestHandler<ProcessPaymentComman
             wallet.Balance -= cart.TotalCost;
             unitOfWork.WalletRepository.Update(wallet);
 
-            unitOfWork.CartItemRepository.DeleteRange(cart.Items);
+            // The database cascades the cart deletion to its items.
             unitOfWork.CartRepository.Delete(cart);
 
             await unitOfWork.Complete();
@@ -64,6 +64,6 @@ public class ProcessPaymentCommandHandler : IRequestHandler<ProcessPaymentComman
             throw;
         }
 
-        return new ApiResponse("Payment successful");
+        return new ApiResponse(true, "Payment successful");
     }
 }

@@ -34,7 +34,6 @@ namespace Pp.Business.Mapper
             CreateMap<WalletRequest, Wallet>();
 
             CreateMap<RegisterRequest, User>();
-            CreateMap<User, RegisterResponse>();
         }
     }
 }

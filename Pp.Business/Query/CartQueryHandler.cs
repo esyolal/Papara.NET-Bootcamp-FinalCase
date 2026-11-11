@@ -2,6 +2,7 @@ using AutoMapper;
 using MediatR;
 using Pp.Base.Response;
 using Pp.Business.Cqrs;
+using Pp.Data.Domain;
 using Pp.Data.UnitOfWork;
 using Pp.Schema;
 
@@ -21,7 +22,7 @@ namespace Pp.Business.Query
 
         public async Task<ApiResponse<CartResponse>> Handle(GetCartByUserIdQuery request, CancellationToken cancellationToken)
         {
-            var cart = await unitOfWork.CartRepository.FirstOrDefault(c => c.UserId == request.UserId, "CartItems");
+            var cart = await unitOfWork.CartRepository.FirstOrDefault(c => c.UserId == request.UserId, nameof(Cart.Items));
             if (cart == null)
             {
                 return new ApiResponse<CartResponse>("Cart not found");

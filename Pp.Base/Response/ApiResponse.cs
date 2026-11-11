@@ -19,6 +19,12 @@ public partial class ApiResponse
             Message = message;
         }
     }
+
+    public ApiResponse(bool isSuccess, string message)
+    {
+        IsSuccess = isSuccess;
+        Message = message;
+    }
 }
 
 public partial class ApiResponse<T>
@@ -46,7 +52,7 @@ public partial class ApiResponse<T>
     
     public ApiResponse(string error)
     {
-        IsSuccess = true;
+        IsSuccess = false;
         Data = default;
         Message = error;
     }
