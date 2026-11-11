@@ -40,25 +40,23 @@ namespace Pp.Business.Command
             var user = mapper.Map<User>(request.Request);
             var username = currentUser.GetCurrentUser();
 
-            if (string.IsNullOrEmpty(user.Password))
+            if (!IsValidPassword(user.Password))
             {
-                return new ApiResponse<UserResponse>("Password cannot be null or empty");
+                return new ApiResponse<UserResponse>("Password must contain between 8 characters and 72 UTF-8 bytes.");
             }
 
             try
             {
                 user.Password = HashPassword(user.Password);
 
-                await unitOfWork.UserRepository.InsertAsync(user, username);
-                await CreateWalletForUser(user.Id);
-                await unitOfWork.Complete();
+                await InsertUserWithWallet(user, username);
 
                 var response = mapper.Map<UserResponse>(user);
                 return new ApiResponse<UserResponse>(response);
             }
-            catch (Exception ex)
+            catch (Microsoft.EntityFrameworkCore.DbUpdateException)
             {
-                return new ApiResponse<UserResponse>($"Error creating user: {ex.Message}");
+                return new ApiResponse<UserResponse>("Unable to create user.");
             }
         }
 
@@ -70,8 +68,20 @@ namespace Pp.Business.Command
                 return new ApiResponse("User not found");
             }
 
-            var updatedUser = mapper.Map(request.Request, existingUser);
-            unitOfWork.UserRepository.Update(updatedUser);
+            var password = request.Request.Password;
+            if (password != null && !IsValidPassword(password))
+            {
+                return new ApiResponse("Password must contain between 8 characters and 72 UTF-8 bytes.");
+            }
+
+            existingUser.Name = request.Request.Name;
+            existingUser.Surname = request.Request.Surname;
+            existingUser.Email = request.Request.Email;
+            existingUser.Phone = request.Request.Phone;
+            if (password != null)
+            {
+                existingUser.Password = HashPassword(password);
+            }
             await unitOfWork.Complete();
             return new ApiResponse();
         }
@@ -99,17 +109,22 @@ namespace Pp.Business.Command
             var user = mapper.Map<User>(request.Request);
             var username = currentUser.GetCurrentUser();
 
-            if (string.IsNullOrEmpty(user.Password))
+            if (!IsValidPassword(user.Password))
             {
-                return new ApiResponse<RegisterResponse>("Password cannot be null or empty");
+                return new ApiResponse<RegisterResponse>("Password must contain between 8 characters and 72 UTF-8 bytes.");
             }
 
             user.Password = HashPassword(user.Password);
             user.Role = "User";
 
-            await unitOfWork.UserRepository.InsertAsync(user, username);
-            await CreateWalletForUser(user.Id);
-            await unitOfWork.Complete();
+            try
+            {
+                await InsertUserWithWallet(user, username);
+            }
+            catch (Microsoft.EntityFrameworkCore.DbUpdateException)
+            {
+                return new ApiResponse<RegisterResponse>("Unable to register user.");
+            }
 
             var response = mapper.Map<RegisterResponse>(user);
             return new ApiResponse<RegisterResponse>(response);
@@ -118,7 +133,7 @@ namespace Pp.Business.Command
         public async Task<ApiResponse<LoginResponse>> Handle(LoginUserCommand request, CancellationToken cancellationToken)
         {
             var user = await unitOfWork.UserRepository.FirstOrDefault(u => u.Email == request.Request.Email);
-            if (user == null || !VerifyPassword(request.Request.Password, user.Password))
+            if (user == null || !user.IsActive || !VerifyPassword(request.Request.Password, user.Password))
             {
                 return new ApiResponse<LoginResponse>("Invalid credentials");
             }
@@ -129,30 +144,39 @@ namespace Pp.Business.Command
             return new ApiResponse<LoginResponse>(response);
         }
 
-        private async Task CreateWalletForUser(long userId)
+        private Task InsertUserWithWallet(User user, string username)
         {
-            var wallet = new Wallet
+            user.Wallet = new Wallet
             {
-                UserId = userId,
-                Points = 0,
-                Balance = 0
+                IsActive = true,
+                InsertDate = DateTime.UtcNow,
+                InsertUser = "System"
             };
 
-            await unitOfWork.WalletRepository.InsertAsync(wallet, "System");
+            return unitOfWork.UserRepository.InsertAsync(user, username);
         }
 
-        private string HashPassword(string password)
+        private static bool IsValidPassword(string password) =>
+            !string.IsNullOrWhiteSpace(password) && password.Length >= 8 &&
+            System.Text.Encoding.UTF8.GetByteCount(password) <= 72;
+
+        private static string HashPassword(string password) => BCrypt.Net.BCrypt.HashPassword(password);
+
+        private static bool VerifyPassword(string inputPassword, string storedPassword)
         {
-            if (string.IsNullOrEmpty(password))
+            if (string.IsNullOrEmpty(inputPassword) || !storedPassword.StartsWith("$2", StringComparison.Ordinal))
             {
-                throw new ArgumentException("Password cannot be null or empty", nameof(password));
+                return false;
             }
-            return BCrypt.Net.BCrypt.HashPassword(password);
-        }
 
-        private bool VerifyPassword(string inputPassword, string storedPassword)
-        {
-            return BCrypt.Net.BCrypt.Verify(inputPassword, storedPassword);
+            try
+            {
+                return BCrypt.Net.BCrypt.Verify(inputPassword, storedPassword);
+            }
+            catch (BCrypt.Net.SaltParseException)
+            {
+                return false;
+            }
         }
     }
 }

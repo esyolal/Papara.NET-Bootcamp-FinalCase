@@ -11,12 +11,13 @@ namespace Pp.Schema
         public decimal Balance { get; set; }
         public decimal Points { get; set; }
     }
+    public record UpdateUserRequest(string Name, string Surname, string Email, string Phone, string? Password);
+
     public class UserResponse
     {
         public string Name { get; set; }
         public string Surname { get; set; }
         public string Email { get; set; }
-        public string Password { get; set; }
         public string Phone { get; set; }
         public string Role { get; set; }
         public decimal Balance { get; set; }

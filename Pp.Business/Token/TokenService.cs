@@ -20,7 +20,7 @@ namespace Pp.Business.Token
         public Task<string> GenerateTokenAsync(User user)
         {
             var claims = GetClaims(user);
-            var secret = Encoding.ASCII.GetBytes(jwtConfig.Secret);
+            var secret = Encoding.UTF8.GetBytes(jwtConfig.Secret);
 
             var jwtToken = new JwtSecurityToken(
                 jwtConfig.Issuer,
@@ -83,7 +83,7 @@ namespace Pp.Business.Token
                 ValidateIssuerSigningKey = true,
                 ValidIssuer = jwtConfig.Issuer,
                 ValidAudience = jwtConfig.Audience,
-                IssuerSigningKey = new SymmetricSecurityKey(Encoding.ASCII.GetBytes(jwtConfig.Secret))
+                IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtConfig.Secret))
             };
 
             return tokenHandler.ValidateToken(token, validationParameters, out validatedToken);

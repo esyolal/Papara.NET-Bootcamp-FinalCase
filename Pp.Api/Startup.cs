@@ -14,12 +14,16 @@ using MediatR;
 using Pp.Data.UnitOfWork;
 using Pp.Business.Services;
 using System.Security.Claims;
+using System.Security.Cryptography;
 
 public class Startup
 {
-    public Startup(IConfiguration configuration)
+    private readonly IWebHostEnvironment environment;
+
+    public Startup(IConfiguration configuration, IWebHostEnvironment environment)
     {
         Configuration = configuration;
+        this.environment = environment;
     }
 
     public IConfiguration Configuration { get; }
@@ -28,13 +32,25 @@ public class Startup
     {
         services.AddHttpContextAccessor();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
-        services.AddScoped<ICreditCardService, CreditCardService>();
+        services.AddSingleton<ICreditCardService, CreditCardService>();
 
         services.AddScoped<ICurrentUser, CurrentUser>();
 
         services.AddMediatR(typeof(RegisterUserCommand).GetTypeInfo().Assembly);
 
-        var jwtConfig = Configuration.GetSection("JwtConfig").Get<JwtConfig>();
+        var jwtConfig = Configuration.GetSection("JwtConfig").Get<JwtConfig>()
+            ?? throw new InvalidOperationException("JwtConfig is missing.");
+        if (string.IsNullOrWhiteSpace(jwtConfig.Secret) &&
+            environment.IsDevelopment())
+        {
+            jwtConfig.Secret = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
+        }
+
+        if (string.IsNullOrWhiteSpace(jwtConfig.Secret) || Encoding.UTF8.GetByteCount(jwtConfig.Secret) < 32)
+        {
+            throw new InvalidOperationException("Configure JwtConfig:Secret with at least 32 bytes.");
+        }
+
         services.AddSingleton(jwtConfig);
 
         services.AddAuthentication(x =>
@@ -51,10 +67,10 @@ public class Startup
                 ValidateIssuer = true,
                 ValidIssuer = jwtConfig.Issuer,
                 ValidateIssuerSigningKey = true,
-                 NameClaimType = ClaimTypes.NameIdentifier,
-                IssuerSigningKey = new SymmetricSecurityKey(Encoding.ASCII.GetBytes(jwtConfig.Secret)),
+                NameClaimType = ClaimTypes.Name,
+                IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtConfig.Secret)),
                 ValidAudience = jwtConfig.Audience,
-                ValidateAudience = false,
+                ValidateAudience = true,
                 ValidateLifetime = true,
                 ClockSkew = TimeSpan.FromMinutes(2)
             };

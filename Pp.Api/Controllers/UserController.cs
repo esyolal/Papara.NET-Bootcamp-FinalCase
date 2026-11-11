@@ -47,7 +47,8 @@ namespace Pp.Api.Controllers
         }
 
         [HttpPut("update/{userId}")]
-        public async Task<ApiResponse> UpdateUser(long userId, [FromBody] UserRequest request)
+        [Authorize(Roles = "Admin")]
+        public async Task<ApiResponse> UpdateUser(long userId, [FromBody] UpdateUserRequest request)
         {
             var command = new UpdateUserCommand(userId, request);
             var result = await _mediator.Send(command);
@@ -55,6 +56,7 @@ namespace Pp.Api.Controllers
         }
 
         [HttpDelete("delete/{userId}")]
+        [Authorize(Roles = "Admin")]
         public async Task<ApiResponse> DeleteUser(long userId)
         {
             var command = new DeleteUserCommand(userId);
