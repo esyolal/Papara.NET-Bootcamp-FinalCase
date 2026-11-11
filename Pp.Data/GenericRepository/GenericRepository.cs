@@ -19,6 +19,11 @@ internal class GenericRepository<TEntity> : IGenericRepository<TEntity> where TE
         await dbContext.SaveChangesAsync();
     }
 
+    public void Add(TEntity entity)
+    {
+        dbContext.Set<TEntity>().Add(entity);
+    }
+
     public async Task<TEntity?> GetById(long id, params string[] includes)
     {
         var query = dbContext.Set<TEntity>().AsQueryable();

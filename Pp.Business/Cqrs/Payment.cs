@@ -5,4 +5,5 @@ public class ProcessPaymentCommand : IRequest<ApiResponse>
 {
     public long CartId { get; set; }
     public bool UsePoints { get; set; }
+    public string? CouponCode { get; set; }
 }

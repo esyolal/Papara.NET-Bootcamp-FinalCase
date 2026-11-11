@@ -32,7 +32,13 @@ namespace Pp.Business.Command
                 return new ApiResponse<ProductResponse>("Request object cannot be null");
             }
 
-            foreach (var categoryId in request.Request.CategoryIds)
+            if (!HasValidAmounts(request.Request))
+            {
+                return new ApiResponse<ProductResponse>("Invalid price or reward points.");
+            }
+
+            var categoryIds = request.Request.CategoryIds.Distinct().ToArray();
+            foreach (var categoryId in categoryIds)
             {
                 var categoryExists = await unitOfWork.CategoryRepository.ExistsAsync(c => c.Id == categoryId);
                 if (!categoryExists)
@@ -43,30 +49,11 @@ namespace Pp.Business.Command
 
             var product = mapper.Map<Product>(request.Request);
             var username = currentUser.GetCurrentUser();
+            product.ProductCategories = categoryIds.Select(id => CreateLink(id, username)).ToList();
 
             try
             {
                 await unitOfWork.ProductRepository.InsertAsync(product, username);
-                await unitOfWork.Complete();
-
-                foreach (var categoryId in request.Request.CategoryIds)
-                {
-                    var productCategory = new ProductCategory
-                    {
-                        ProductId = product.Id,
-                        CategoryId = categoryId
-                    };
-
-                    var categoryExists = await unitOfWork.CategoryRepository.ExistsAsync(c => c.Id == categoryId);
-                    if (!categoryExists)
-                    {
-                        throw new Exception($"Category with Id {categoryId} does not exist");
-                    }
-
-                    await unitOfWork.ProductCategoryRepository.InsertAsync(productCategory, username);
-                }
-
-                await unitOfWork.Complete();
 
                 var response = mapper.Map<ProductResponse>(product);
                 return new ApiResponse<ProductResponse>(response);
@@ -82,33 +69,36 @@ namespace Pp.Business.Command
 
         public async Task<ApiResponse> Handle(UpdateProductCommand request, CancellationToken cancellationToken)
         {
-            var existingProduct = await unitOfWork.ProductRepository.GetById(request.ProductId);
+            if (!HasValidAmounts(request.Request))
+            {
+                return new ApiResponse("Invalid price or reward points.");
+            }
+
+            var existingProduct = await unitOfWork.ProductRepository.GetById(request.ProductId, nameof(Product.ProductCategories));
             if (existingProduct == null)
             {
                 return new ApiResponse("Product not found");
             }
 
-            var updatedProduct = mapper.Map(request.Request, existingProduct);
-            unitOfWork.ProductRepository.Update(updatedProduct);
-
-
-            var existingProductCategories = await unitOfWork.ProductCategoryRepository.Find(pc => pc.ProductId == request.ProductId);
-            foreach (var pc in existingProductCategories)
+            var categoryIds = request.Request.CategoryIds.ToHashSet();
+            foreach (var categoryId in categoryIds)
             {
-                await unitOfWork.ProductCategoryRepository.Delete(pc.Id);
-            }
-
-
-            foreach (var categoryId in request.Request.CategoryIds)
-            {
-                var productCategory = new ProductCategory
+                if (!await unitOfWork.CategoryRepository.ExistsAsync(category => category.Id == categoryId))
                 {
-                    ProductId = updatedProduct.Id,
-                    CategoryId = categoryId
-                };
-                await unitOfWork.ProductCategoryRepository.InsertAsync(productCategory, currentUser.GetCurrentUser());
+                    return new ApiResponse($"Category with Id {categoryId} does not exist");
+                }
             }
 
+            mapper.Map(request.Request, existingProduct);
+            var existingLinks = existingProduct.ProductCategories.ToArray();
+            foreach (var link in existingLinks.Where(link => !categoryIds.Contains(link.CategoryId)))
+            {
+                unitOfWork.ProductCategoryRepository.Delete(link);
+            }
+            foreach (var categoryId in categoryIds.Except(existingLinks.Select(link => link.CategoryId)))
+            {
+                existingProduct.ProductCategories.Add(CreateLink(categoryId, currentUser.GetCurrentUser()));
+            }
             await unitOfWork.Complete();
             return new ApiResponse();
         }
@@ -123,14 +113,25 @@ namespace Pp.Business.Command
             var productCategories = await unitOfWork.ProductCategoryRepository.Find(pc => pc.ProductId == request.ProductId);
             foreach (var pc in productCategories)
             {
-                await unitOfWork.ProductCategoryRepository.Delete(pc.Id);
+                unitOfWork.ProductCategoryRepository.Delete(pc);
             }
 
 
-            await unitOfWork.ProductRepository.Delete(request.ProductId);
+            unitOfWork.ProductRepository.Delete(existingProduct);
             await unitOfWork.Complete();
             return new ApiResponse();
         }
 
+        private static bool HasValidAmounts(ProductRequest request) =>
+            request.Price >= 0 && decimal.Round(request.Price, 2) == request.Price &&
+            request.PointsPercentage is >= 0 and <= 100 && request.MaxPoints >= 0;
+
+        private static ProductCategory CreateLink(long categoryId, string username) => new()
+        {
+            CategoryId = categoryId,
+            InsertUser = username,
+            InsertDate = DateTime.UtcNow,
+            IsActive = true
+        };
     }
 }

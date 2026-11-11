@@ -8,6 +8,8 @@ public interface IUnitOfWork
     Task Complete();
     Task CompleteWithTransaction();
     IGenericRepository<Cart> CartRepository { get; }
+    IGenericRepository<Coupon> CouponRepository { get; }
+    IGenericRepository<OrderRecord> OrderRepository { get; }
     IGenericRepository<CartItem> CartItemRepository { get; }
     IGenericRepository<Category> CategoryRepository { get; }
 

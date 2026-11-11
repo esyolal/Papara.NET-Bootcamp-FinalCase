@@ -16,6 +16,7 @@ namespace Pp.Data.Context
         public DbSet<Wallet> Wallets { get; set; }
 
         public DbSet<Coupon> Coupons { get; set; }
+        public DbSet<OrderRecord> Orders { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -28,6 +29,15 @@ namespace Pp.Data.Context
             modelBuilder.ApplyConfiguration(new ProductCategoryConfiguration());
             modelBuilder.ApplyConfiguration(new WalletConfiguration());
             modelBuilder.ApplyConfiguration(new CouponConfiguration());
+            modelBuilder.Entity<OrderRecord>(order =>
+            {
+                order.HasIndex(o => new { o.UserId, o.Id });
+                order.Property(o => o.CouponCode).HasMaxLength(450);
+                order.Property(o => o.Subtotal).HasPrecision(18, 2);
+                order.Property(o => o.CouponDiscount).HasPrecision(18, 2);
+                order.Property(o => o.PointsUsed).HasPrecision(18, 2);
+                order.Property(o => o.AmountPaid).HasPrecision(18, 2);
+            });
         }
     }
 

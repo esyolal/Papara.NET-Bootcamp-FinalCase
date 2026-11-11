@@ -72,10 +72,10 @@ namespace Pp.Business.Command
             var categoryProducts = await unitOfWork.ProductCategoryRepository.Find(pc => pc.CategoryId == request.CategoryId);
             foreach (var pc in categoryProducts)
             {
-                await unitOfWork.ProductCategoryRepository.Delete(pc.Id);
+                unitOfWork.ProductCategoryRepository.Delete(pc);
             }
 
-            await unitOfWork.CategoryRepository.Delete(request.CategoryId);
+            unitOfWork.CategoryRepository.Delete(existingCategory);
             await unitOfWork.Complete();
             return new ApiResponse();
         }

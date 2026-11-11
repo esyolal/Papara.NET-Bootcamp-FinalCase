@@ -8,7 +8,7 @@ namespace Pp.Api.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
-    [Authorize(Roles = "Admin")]
+    [Authorize]
     public class ProductController : ControllerBase
     {
         private readonly IMediator mediator;
@@ -19,6 +19,7 @@ namespace Pp.Api.Controllers
         }
 
         [HttpPost]
+        [Authorize(Roles = "Admin")]
         public async Task<IActionResult> Create([FromBody] ProductRequest request)
         {
             var command = new CreateProductCommand(request);
@@ -27,6 +28,7 @@ namespace Pp.Api.Controllers
         }
 
         [HttpPut("{id}")]
+        [Authorize(Roles = "Admin")]
         public async Task<IActionResult> Update(long id, [FromBody] ProductRequest request)
         {
             var command = new UpdateProductCommand(id, request);
@@ -35,6 +37,7 @@ namespace Pp.Api.Controllers
         }
 
         [HttpDelete("{id}")]
+        [Authorize(Roles = "Admin")]
         public async Task<IActionResult> Delete(long id)
         {
             var command = new DeleteProductCommand(id);

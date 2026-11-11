@@ -24,88 +24,104 @@ public class CartCommandHandler :
 
     public async Task<ApiResponse> Handle(AddProductToCartCommand request, CancellationToken cancellationToken)
     {
-        var userId = currentUser.GetCurrentUserId();
-        var cart = await unitOfWork.CartRepository.FirstOrDefault(c => c.UserId == userId);
-
-        if (cart == null)
+        if (request.Quantity <= 0)
         {
-            cart = new Cart { UserId = userId };
-            await unitOfWork.CartRepository.InsertAsync(cart, currentUser.GetCurrentUser());
+            return new ApiResponse("Quantity must be positive");
         }
 
-        var product = await unitOfWork.ProductRepository.FirstOrDefault(p => p.Id == request.ProductId);
+        var product = await unitOfWork.ProductRepository.FirstOrDefault(p => p.Id == request.ProductId && p.IsActive);
         if (product == null)
         {
             return new ApiResponse("Product not found");
         }
 
-        var cartItem = await unitOfWork.CartItemRepository.FirstOrDefault(ci => ci.CartId == cart.Id && ci.ProductId == request.ProductId);
+        var userId = currentUser.GetCurrentUserId();
+        var cart = await unitOfWork.CartRepository.FirstOrDefault(c => c.UserId == userId, nameof(Cart.Items));
+        var lineAmount = product.Price * request.Quantity;
+
+        if (cart == null)
+        {
+            cart = new Cart { UserId = userId, TotalCost = lineAmount };
+            cart.Items.Add(CreateItem(request, lineAmount));
+            await unitOfWork.CartRepository.InsertAsync(cart, currentUser.GetCurrentUser());
+            return new ApiResponse();
+        }
+
+        var cartItem = cart.Items.FirstOrDefault(item => item.ProductId == request.ProductId);
         if (cartItem != null)
         {
-           
-            var previousQuantity = cartItem.Quantity;
+            if (request.Quantity > int.MaxValue - cartItem.Quantity)
+            {
+                return new ApiResponse("Quantity is too large");
+            }
             cartItem.Quantity += request.Quantity;
-            cartItem.Price += request.Quantity * product.Price; 
-
-            cart.TotalCost += (request.Quantity * product.Price); 
-
-            unitOfWork.CartItemRepository.Update(cartItem);
+            cartItem.Price += lineAmount;
         }
         else
         {
-       
-            cartItem = new CartItem
-            {
-                CartId = cart.Id,
-                ProductId = request.ProductId,
-                Quantity = request.Quantity,
-                Price = request.Quantity * product.Price 
-            };
-            await unitOfWork.CartItemRepository.InsertAsync(cartItem, currentUser.GetCurrentUser());
-
-          
-            cart.TotalCost += cartItem.Price; 
+            cart.Items.Add(CreateItem(request, lineAmount));
         }
 
-        unitOfWork.CartRepository.Update(cart); 
+        cart.TotalCost = cart.Items.Sum(item => item.Price);
         await unitOfWork.Complete();
         return new ApiResponse();
     }
 
     public async Task<ApiResponse> Handle(RemoveProductFromCartCommand request, CancellationToken cancellationToken)
     {
+        if (request.Quantity <= 0)
+        {
+            return new ApiResponse("Quantity must be positive");
+        }
+
         var userId = currentUser.GetCurrentUserId();
-        var cart = await unitOfWork.CartRepository.FirstOrDefault(c => c.UserId == userId);
+        var cart = await unitOfWork.CartRepository.FirstOrDefault(c => c.UserId == userId, nameof(Cart.Items));
 
         if (cart == null)
         {
             return new ApiResponse("Cart not found");
         }
 
-        var cartItem = await unitOfWork.CartItemRepository.FirstOrDefault(ci => ci.CartId == cart.Id && ci.ProductId == request.ProductId);
+        var cartItem = cart.Items.FirstOrDefault(item => item.ProductId == request.ProductId);
         if (cartItem == null)
         {
             return new ApiResponse("Product not found in cart");
         }
 
-        var priceToRemove = request.Quantity * (cartItem.Price / cartItem.Quantity);
+        if (request.Quantity > cartItem.Quantity)
+        {
+            return new ApiResponse("Quantity exceeds the amount in the cart");
+        }
+
+        var priceToRemove = request.Quantity == cartItem.Quantity
+            ? cartItem.Price
+            : decimal.Round(cartItem.Price * request.Quantity / cartItem.Quantity, 2);
 
         cartItem.Quantity -= request.Quantity;
         if (cartItem.Quantity <= 0)
         {
             unitOfWork.CartItemRepository.Delete(cartItem);
+            cart.Items.Remove(cartItem);
         }
         else
         {
             cartItem.Price -= priceToRemove; 
-            unitOfWork.CartItemRepository.Update(cartItem);
         }
 
 
-        cart.TotalCost -= priceToRemove; 
+        cart.TotalCost = cart.Items.Sum(item => item.Price);
 
-        unitOfWork.CartRepository.Update(cart); 
         await unitOfWork.Complete();
         return new ApiResponse();
     }
+
+    private CartItem CreateItem(AddProductToCartCommand request, decimal lineAmount) => new()
+    {
+        ProductId = request.ProductId,
+        Quantity = request.Quantity,
+        Price = lineAmount,
+        IsActive = true,
+        InsertDate = DateTime.UtcNow,
+        InsertUser = currentUser.GetCurrentUser()
+    };
 }

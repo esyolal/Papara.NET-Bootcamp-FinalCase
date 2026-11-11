@@ -9,7 +9,7 @@ namespace Pp.Api.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
-    [Authorize(Roles = "Admin")]
+    [Authorize]
     public class CategoryController : ControllerBase
     {
         private readonly IMediator mediator;
@@ -20,6 +20,7 @@ namespace Pp.Api.Controllers
         }
 
         [HttpPost]
+        [Authorize(Roles = "Admin")]
         public async Task<IActionResult> Create([FromBody] CategoryRequest request)
         {
             var command = new CreateCategoryCommand(request);
@@ -28,6 +29,7 @@ namespace Pp.Api.Controllers
         }
 
         [HttpPut("{id}")]
+        [Authorize(Roles = "Admin")]
         public async Task<IActionResult> Update(long id, [FromBody] CategoryRequest request)
         {
             var command = new UpdateCategoryCommand(id, request);
@@ -36,6 +38,7 @@ namespace Pp.Api.Controllers
         }
 
         [HttpDelete("{id}")]
+        [Authorize(Roles = "Admin")]
         public async Task<IActionResult> Delete(long id)
         {
             var command = new DeleteCategoryCommand(id);

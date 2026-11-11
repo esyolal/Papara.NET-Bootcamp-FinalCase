@@ -1,4 +1,5 @@
 using MediatR;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Pp.Base.Response;
 using Pp.Business.Cqrs;
@@ -8,6 +9,7 @@ using Pp.Schema;
 namespace Pp.WebApi.Controllers
 {
     [ApiController]
+    [Authorize]
     [Route("api/[controller]")]
     public class WalletController : ControllerBase
     {
@@ -48,35 +50,33 @@ namespace Pp.WebApi.Controllers
         [HttpPost("add-funds")]
         public async Task<ApiResponse<WalletResponse>> AddFundsToWallet(WalletRequest request, CancellationToken cancellationToken)
         {
+            var userId = currentUser.GetCurrentUserId();
+            if (!creditCardService.TryDebit(userId, request.CreditCardNumber, request.ExpiryDate, request.CVV, request.Amount))
+            {
+                return new ApiResponse<WalletResponse>("Invalid test card, amount, or insufficient card balance.");
+            }
+
             try
             {
-                var userId = currentUser.GetCurrentUserId();
-
-                if (!creditCardService.ValidateCreditCard(request.CreditCardNumber, request.ExpiryDate, request.CVV))
-                {
-                    return new ApiResponse<WalletResponse>("Invalid credit card details.");
-                }
-
-                if (!creditCardService.ValidateTransaction(request.Amount))
-                {
-                    return new ApiResponse<WalletResponse>("Insufficient card balance.");
-                }
-
                 var command = new AddFundsToWalletCommand(userId, request.Amount);
                 var response = await mediator.Send(command, cancellationToken);
-
+                if (!response.IsSuccess)
+                {
+                    creditCardService.Refund(userId, request.CreditCardNumber, request.Amount);
+                }
                 return response;
             }
-            catch (Exception ex)
+            catch
             {
-                return new ApiResponse<WalletResponse>($"Error adding funds: {ex.Message}");
+                creditCardService.Refund(userId, request.CreditCardNumber, request.Amount);
+                throw;
             }
         }
 
         [HttpPost("generate-credit-card")]
         public ApiResponse<CreditCardInfo> GenerateCreditCard()
         {
-            var creditCardInfo = creditCardService.GenerateCreditCard();
+            var creditCardInfo = creditCardService.GenerateCreditCard(currentUser.GetCurrentUserId());
             return new ApiResponse<CreditCardInfo>(creditCardInfo);
         }
     }

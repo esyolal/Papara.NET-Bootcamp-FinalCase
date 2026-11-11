@@ -25,6 +25,11 @@ namespace Pp.Business.Command
 
         public async Task<ApiResponse<WalletResponse>> Handle(AddFundsToWalletCommand request, CancellationToken cancellationToken)
         {
+            if (request.Amount <= 0 || decimal.Round(request.Amount, 2) != request.Amount)
+            {
+                return new ApiResponse<WalletResponse>("Invalid amount");
+            }
+
             var userId = currentUser.GetCurrentUserId();
 
             var wallet = await unitOfWork.WalletRepository.FirstOrDefault(w => w.UserId == userId);

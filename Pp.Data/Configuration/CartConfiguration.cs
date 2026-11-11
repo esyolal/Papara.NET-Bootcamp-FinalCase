@@ -23,6 +23,7 @@ public class CartConfiguration : IEntityTypeConfiguration<Cart>
                .OnDelete(DeleteBehavior.Cascade);
 
         builder.Property(c => c.TotalCost)
+       .IsConcurrencyToken()
        .HasColumnType("decimal(18,2)")
        .IsRequired()
        .HasDefaultValue(0);

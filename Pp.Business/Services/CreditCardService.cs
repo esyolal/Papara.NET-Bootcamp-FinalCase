@@ -4,44 +4,62 @@ namespace Pp.Business.Services
     {
         private const decimal CardLimit = 10000M;
 
-        private static readonly Dictionary<string, CreditCardInfo> StoredCreditCards = new Dictionary<string, CreditCardInfo>();
+        private readonly Dictionary<string, TestCard> cards = new();
+        private readonly object cardLock = new();
 
-        public CreditCardInfo GenerateCreditCard()
+        public CreditCardInfo GenerateCreditCard(long userId)
         {
-            Random random = new Random();
-            string cardNumber = $"{random.Next(1000, 9999)}-{random.Next(1000, 9999)}-{random.Next(1000, 9999)}-{random.Next(1000, 9999)}";
-            string expiryDate = $"{random.Next(1, 12).ToString("D2")}/{random.Next(DateTime.Now.Year, DateTime.Now.Year + 5)}";
-            string cvv = random.Next(100, 999).ToString();
-
-            var creditCardInfo = new CreditCardInfo
+            var expires = DateTime.UtcNow.AddYears(2);
+            var endOfMonth = new DateTime(expires.Year, expires.Month, 1, 0, 0, 0, DateTimeKind.Utc).AddMonths(1);
+            var card = new CreditCardInfo
             {
-                CardNumber = cardNumber,
-                ExpiryDate = expiryDate,
-                CVV = cvv
+                CardNumber = $"TEST-{Guid.NewGuid():N}",
+                ExpiryDate = expires.ToString("MM/yyyy", System.Globalization.CultureInfo.InvariantCulture),
+                CVV = System.Security.Cryptography.RandomNumberGenerator.GetInt32(100, 1000).ToString()
             };
 
-            StoredCreditCards[cardNumber] = creditCardInfo;
-
-            return creditCardInfo;
-        }
-
-        public decimal GetCardLimit()
-        {
-            return CardLimit;
-        }
-
-        public bool ValidateTransaction(decimal amount)
-        {
-            return amount <= CardLimit;
-        }
-
-        public bool ValidateCreditCard(string cardNumber, string expiryDate, string cvv)
-        {
-            if (StoredCreditCards.TryGetValue(cardNumber, out var storedCard))
+            lock (cardLock)
             {
-                return storedCard.ExpiryDate == expiryDate && storedCard.CVV == cvv;
+                cards.Add(card.CardNumber, new TestCard(userId, card.ExpiryDate, card.CVV, endOfMonth));
             }
-            return false;
+            return card;
+        }
+
+        public bool TryDebit(long userId, string cardNumber, string expiryDate, string cvv, decimal amount)
+        {
+            if (string.IsNullOrWhiteSpace(cardNumber) || amount <= 0 || decimal.Round(amount, 2) != amount)
+            {
+                return false;
+            }
+
+            lock (cardLock)
+            {
+                if (!cards.TryGetValue(cardNumber, out var card) || card.UserId != userId ||
+                    card.ExpiryDate != expiryDate || card.Cvv != cvv ||
+                    card.ExpiresAt <= DateTime.UtcNow || card.Balance < amount)
+                {
+                    return false;
+                }
+
+                card.Balance -= amount;
+                return true;
+            }
+        }
+
+        public void Refund(long userId, string cardNumber, decimal amount)
+        {
+            lock (cardLock)
+            {
+                if (cards.TryGetValue(cardNumber, out var card) && card.UserId == userId)
+                {
+                    card.Balance += amount;
+                }
+            }
+        }
+
+        private sealed record TestCard(long UserId, string ExpiryDate, string Cvv, DateTime ExpiresAt)
+        {
+            public decimal Balance { get; set; } = CardLimit;
         }
     }
 

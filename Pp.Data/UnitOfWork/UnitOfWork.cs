@@ -12,6 +12,8 @@ public class UnitOfWork : IUnitOfWork, IDisposable
     private IDbContextTransaction _transaction;
 
     public IGenericRepository<Cart> CartRepository { get; }
+    public IGenericRepository<Coupon> CouponRepository { get; }
+    public IGenericRepository<OrderRecord> OrderRepository { get; }
     public IGenericRepository<CartItem> CartItemRepository { get; }
     public IGenericRepository<Category> CategoryRepository { get; }
     public IGenericRepository<Product> ProductRepository { get; }
@@ -27,6 +29,8 @@ public class UnitOfWork : IUnitOfWork, IDisposable
         this.dbContext = dbContext;
 
         CartRepository = new GenericRepository<Cart>(this.dbContext);
+        CouponRepository = new GenericRepository<Coupon>(this.dbContext);
+        OrderRepository = new GenericRepository<OrderRecord>(this.dbContext);
         CartItemRepository = new GenericRepository<CartItem>(this.dbContext);
         CategoryRepository = new GenericRepository<Category>(this.dbContext);
         UserRepository = new GenericRepository<User>(this.dbContext);

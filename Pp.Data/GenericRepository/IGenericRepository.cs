@@ -5,6 +5,7 @@ namespace Pp.Data.GenericRepository;
 public interface IGenericRepository<TEntity> where TEntity : class
 {
     Task Save();
+    void Add(TEntity entity);
     Task<TEntity?> GetById(long Id, params string[] includes);
     Task InsertAsync(TEntity entity, string Name);
     void Update(TEntity entity);

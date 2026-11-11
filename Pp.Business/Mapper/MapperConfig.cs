@@ -12,7 +12,8 @@ namespace Pp.Business.Mapper
 
             CreateMap<User, UserResponse>();
 
-            CreateMap<User, RegisterResponse>();
+            CreateMap<User, RegisterResponse>()
+                .ForMember(dest => dest.UserId, opt => opt.MapFrom(src => src.Id.ToString()));
             CreateMap<User, LoginResponse>()
            .ForMember(dest => dest.UserId, opt => opt.MapFrom(src => src.Id.ToString()))
            .ForMember(dest => dest.Name, opt => opt.MapFrom(src => $"{src.Name} {src.Surname}"))
@@ -24,7 +25,8 @@ namespace Pp.Business.Mapper
             CreateMap<Product, ProductResponse>();
             CreateMap<ProductRequest, Product>();
 
-            CreateMap<Cart, CartResponse>();
+            CreateMap<Cart, CartResponse>()
+                .ForMember(dest => dest.TotalAmount, opt => opt.MapFrom(src => src.Items.Sum(item => item.Price)));
             CreateMap<CartRequest, Cart>();
 
             CreateMap<CartItem, CartItemResponse>();

@@ -13,6 +13,8 @@ public class CouponConfiguration : IEntityTypeConfiguration<Coupon>
         builder.HasIndex(c => c.Code)
             .IsUnique();
 
+        builder.Property(c => c.UsedByUserId).IsConcurrencyToken();
+        builder.Property(c => c.IsActive).IsConcurrencyToken();
         builder.HasOne<User>()
             .WithMany()
             .HasForeignKey(c => c.UsedByUserId)

@@ -7,7 +7,7 @@ namespace Pp.Data.Domain
         public decimal DiscountAmount { get; set; }
         public DateTime ValidityStartDate { get; set; }
         public DateTime ValidityEndDate { get; set; }
-        public long UsedByUserId { get; set; }
+        public long? UsedByUserId { get; set; }
 
     }
 }
