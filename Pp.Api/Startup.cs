@@ -81,11 +81,15 @@ public class Startup
         services.AddDbContext<AppDbContext>(options => options.UseSqlServer(connectionStringSql));
 
     
-        var mapperConfig = new MapperConfiguration(cfg =>
+        services.AddAutoMapper(cfg =>
         {
-            cfg.AddProfile(new MapperConfig());
-        });
-        services.AddSingleton(mapperConfig.CreateMapper());
+            cfg.AddProfile<MapperConfig>();
+            var licenseKey = Configuration["AutoMapper:LicenseKey"];
+            if (!string.IsNullOrWhiteSpace(licenseKey))
+            {
+                cfg.LicenseKey = licenseKey;
+            }
+        }, Array.Empty<Assembly>());
 
     
         services.AddScoped<ITokenService, TokenService>();

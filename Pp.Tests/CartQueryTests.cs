@@ -1,5 +1,6 @@
 using System.Linq.Expressions;
 using AutoMapper;
+using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using NUnit.Framework;
 using Pp.Business.Cqrs;
@@ -30,7 +31,8 @@ public class CartQueryTests
                 new[] { cart }.FirstOrDefault(predicate.Compile())!);
         var unitOfWork = new Mock<IUnitOfWork>();
         unitOfWork.SetupGet(unit => unit.CartRepository).Returns(carts.Object);
-        var mapper = new MapperConfiguration(config => config.AddProfile<MapperConfig>()).CreateMapper();
+        var mapper = new MapperConfiguration(config => config.AddProfile<MapperConfig>(),
+            NullLoggerFactory.Instance).CreateMapper();
         var handler = new CartQueryHandler(unitOfWork.Object, mapper);
 
         var result = await handler.Handle(new GetCartByUserIdQuery(userId), CancellationToken.None);
